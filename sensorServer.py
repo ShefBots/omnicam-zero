@@ -8,9 +8,7 @@ from enum import Enum
 import json
 import os
 
-class Mode(Enum):
-    TIME = 0
-    RANDOM = 1
+from protocol import Mode, SLEEP_TIME
 
 CONNECTIONS = set()
 MODE = Mode.TIME
@@ -31,13 +29,13 @@ async def register(websocket):
         async for message in websocket:
             print(f"Recieved control command \"{message}\"")
             match message:
-                case "R":
+                case Mode.RANDOM.value:
                     print("Switching to RANDOM mode...")
                     MODE = Mode.RANDOM
-                case "T":
+                case Mode.TIME.value:
                     print("Switching to TIME mode...")
                     MODE = Mode.TIME
-                case "S":
+                case Mode.STOP.value:
                     print("Stopping...")
                     exit()
     finally:
@@ -56,13 +54,18 @@ async def main():
         time = str(datetime.now())
         match MODE:
             case Mode.TIME:
-                print(f"[{time}] Transmitting time...")
+                print(f"[{time}] Broadcasting time...")
+                await asyncio.sleep(random.random() * 2 + 1)
                 message = json.dumps({"datetime":time})
-                websockets.broadcast(CONNECTIONS, message)
+                if MODE == Mode.TIME:
+                    websockets.broadcast(CONNECTIONS, message)
             case Mode.RANDOM:
-                print(f"[{time}] Transmitting random number...")
+                print(f"[{time}] Broadcasting random number...")
+                await asyncio.sleep(random.random() * 2 + 1)
                 message = json.dumps({"random":random.random()})
-                websockets.broadcast(CONNECTIONS, message)
-        await asyncio.sleep(random.random() * 2 + 1)
+                if MODE == Mode.RANDOM:
+                    websockets.broadcast(CONNECTIONS, message)
+            case Mode.PAUSE:
+                await asyncio.sleep(SLEEP_TIME)
 
 asyncio.run(launch_server())
