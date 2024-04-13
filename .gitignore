@@ -1,3 +1,4 @@
 **/*.swp
 target.config
 local.config
+**/__pycache__/*
