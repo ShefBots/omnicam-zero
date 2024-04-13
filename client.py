@@ -2,9 +2,15 @@
 
 import asyncio
 from websockets.sync.client import connect
+import os
 
 SERVER_ADDR = "localhost"
-#SERVER_ADDR = "192.168.22.1"
+
+if os.path.exists("target.config"):
+    print("Target config found.")
+    SERVER_ADDR = "192.168.22.1"
+else:
+    print("No target config found. Assuming localhost...")
 
 def recieve_data(n):
     with connect(f"ws://{SERVER_ADDR}:1337") as websocket:
