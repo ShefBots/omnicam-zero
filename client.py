@@ -28,4 +28,5 @@ recieve_data(2)
 print("transmitting 'T'")
 transmit_modechange("T")
 recieve_data(2)
+transmit_modechange("S")
 

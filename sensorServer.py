@@ -37,6 +37,9 @@ async def register(websocket):
                 case "T":
                     print("Switching to TIME mode...")
                     MODE = Mode.TIME
+                case "S":
+                    print("Stopping...")
+                    exit()
     finally:
         CONNECTIONS.remove(websocket)
 
