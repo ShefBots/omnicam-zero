@@ -6,15 +6,20 @@ from websockets.sync.client import connect
 SERVER_ADDR = "localhost"
 #SERVER_ADDR = "192.168.22.1"
 
-def recieve_data():
+def recieve_data(n):
     with connect(f"ws://{SERVER_ADDR}:1337") as websocket:
-        for i in range(5):
+        for i in range(n):
             print(f"Recieved:\n{websocket.recv()}")
-        #websocket.send("Hello world!")
-        #message = websocket.recv()
-        #print(f"Received: {message}")
 
-recieve_data()
+def transmit_modechange(m):
+    with connect(f"ws://{SERVER_ADDR}:1337") as websocket:
+        websocket.send(m) # Transmit a switch to the 'RANDOM' mode.
 
-#transmit_modechange():
+recieve_data(2)
+print("transmitting 'R'")
+transmit_modechange("R")
+recieve_data(2)
+print("transmitting 'T'")
+transmit_modechange("T")
+recieve_data(2)
 
