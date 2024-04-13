@@ -6,6 +6,7 @@ import random
 import websockets
 from enum import Enum
 import json
+import os
 
 class Mode(Enum):
     TIME = 0
@@ -13,6 +14,13 @@ class Mode(Enum):
 
 CONNECTIONS = set()
 MODE = Mode.TIME
+SERVER_ADDR = "localhost"
+
+if os.path.exists("local.config"):
+    print("Local config found.")
+    SERVER_ADDR = "192.168.22.1"
+else:
+    print("No local config found. Assuming localhost...")
 
 # Registers a new connection (of which there should only be one)
 async def register(websocket):
@@ -34,7 +42,7 @@ async def register(websocket):
 
 async def launch_server():
     print("Launching websocket server...")
-    async with websockets.serve(register, "localhost", 1337):
+    async with websockets.serve(register, SERVER_ADDR, 1337):
         print("Websocket server launched.")
         await main() # Launch the main task
 
