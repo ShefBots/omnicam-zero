@@ -54,18 +54,30 @@ async def main():
         time = str(datetime.now())
         match MODE:
             case Mode.TIME:
-                print(f"[{time}] Broadcasting time...")
-                await asyncio.sleep(random.random() * 2 + 1)
-                message = json.dumps({"datetime":time})
-                if MODE == Mode.TIME:
-                    websockets.broadcast(CONNECTIONS, message)
+                await checked_transmit(get_time_data, Mode.TIME)
             case Mode.RANDOM:
-                print(f"[{time}] Broadcasting random number...")
-                await asyncio.sleep(random.random() * 2 + 1)
-                message = json.dumps({"random":random.random()})
-                if MODE == Mode.RANDOM:
-                    websockets.broadcast(CONNECTIONS, message)
+                await checked_transmit(get_random_number, Mode.RANDOM)
             case Mode.PAUSE:
                 await asyncio.sleep(SLEEP_TIME)
+
+async def checked_transmit(data_generator, mode):
+    print(f"[{str(datetime.now())}] Starting {mode.value} operation...")
+    data = await data_generator()
+    # Only transmit if mode is still the requested mode
+    print(f"[{str(datetime.now())}] \t Operation finished.")
+    if MODE == mode:
+        print(f"[{str(datetime.now())}] \t Transmitting.")
+        websockets.broadcast(CONNECTIONS, data)
+    else:
+        print(f"[{str(datetime.now())}] \t Mode changed while calculating. Discarding data.")
+
+async def get_time_data():
+    await asyncio.sleep(random.random() * 2 + 1) # Simulate processing delay
+    return json.dumps({"datetime":str(datetime.now())})
+
+async def get_random_number():
+    await asyncio.sleep(random.random() * 2 + 1) # Simulate processing delay
+    return json.dumps({"random":random.random()})
+    
 
 asyncio.run(launch_server())
