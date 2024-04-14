@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import argparse
 import asyncio
 from datetime import datetime
 import random
@@ -8,17 +9,19 @@ from enum import Enum
 import json
 import os
 
+import detectors.minesweeperDetector
 from protocol import Mode, SLEEP_TIME
 
-CONNECTIONS = set()
-MODE = Mode.TIME
-SERVER_ADDR = "localhost"
+args = argparse.ArgumentParser(description="Launches a websocket server that transmits task-specific sensor data data.")
+args.add_argument("-m", "--mode", type=Mode, default=Mode.PAUSE, help=f"The mode to start the server in. Specified using the string types of The Mode class (i.e. {','.join([str(m.value) for m in Mode][:-1])} or {str(Mode.STOP.value)})")
+args.add_argument("-r", "--remote", action="store_true", help="Use this flag to host a server at 192.168.22.1 (on the Pi Zero). If not, it is hosted on localhost.")
+args = args.parse_args()
 
-if os.path.exists("local.config"):
-    print("Local config found.")
-    SERVER_ADDR = "192.168.22.1"
-else:
-    print("No local config found. Assuming localhost...")
+MODE = args.mode
+SERVER_ADDR = "192.168.22.1" if args.remote else "localhost" 
+print(f"Starting server in mode {MODE} on {SERVER_ADDR}...")
+
+CONNECTIONS = set()
 
 # Registers a new connection (of which there should only be one)
 async def register(websocket):
@@ -52,7 +55,8 @@ async def main():
     tasks = {
                 Mode.TIME: lambda: checked_transmit(get_time_data, Mode.TIME),
                 Mode.RANDOM: lambda: checked_transmit(get_random_number, Mode.RANDOM),
-                Mode.PAUSE: lambda: checked_transmit(be_low_power, Mode.PAUSE)
+                Mode.PAUSE: lambda: checked_transmit(be_low_power, Mode.PAUSE),
+                Mode.TASK_MINESWEEPER: lambda: checked_transmit(get_minesweeper_data, Mode.TASK_MINESWEEPER)
             }
     #I wonder why the below doesn't work...
     #tasks = {
@@ -85,6 +89,10 @@ async def get_random_number():
 
 async def be_low_power():
     await asyncio.sleep(SLEEP_TIME)
+    
+async def get_minesweeper_data():
+    data = minesweeperDetector.get_data()
+    return json.dumps(data)
     
 
 asyncio.run(launch_server())
