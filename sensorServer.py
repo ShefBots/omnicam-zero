@@ -49,19 +49,23 @@ async def launch_server():
 
 # Handles the task of accquiring and processing visual data
 async def main():
+    tasks = {
+                Mode.TIME: lambda: checked_transmit(get_time_data, Mode.TIME),
+                Mode.RANDOM: lambda: checked_transmit(get_random_number, Mode.RANDOM),
+                Mode.PAUSE: lambda: checked_transmit(be_low_power, Mode.PAUSE)
+            }
+    #I wonder why the below doesn't work...
+    #tasks = {
+    #            Mode.TIME: get_time_data,
+    #            Mode.RANDOM: get_random_number,
+    #            Mode.PAUSE: be_low_power,
+    #        }
+    #tasks_2 = {tk:(lambda: checked_transmit(tasks[tk], tk)) for tk in tasks.keys()}
     while True:
-        # Currently just transmits some test data
-        time = str(datetime.now())
-        match MODE:
-            case Mode.TIME:
-                await checked_transmit(get_time_data, Mode.TIME)
-            case Mode.RANDOM:
-                await checked_transmit(get_random_number, Mode.RANDOM)
-            case Mode.PAUSE:
-                await asyncio.sleep(SLEEP_TIME)
+        await tasks[MODE]()
 
 async def checked_transmit(data_generator, mode):
-    print(f"[{str(datetime.now())}] Starting {mode.value} operation...")
+    print(f"[{str(datetime.now())}] Starting {mode} operation...")
     data = await data_generator()
     # Only transmit if mode is still the requested mode
     print(f"[{str(datetime.now())}] \t Operation finished.")
@@ -78,6 +82,9 @@ async def get_time_data():
 async def get_random_number():
     await asyncio.sleep(random.random() * 2 + 1) # Simulate processing delay
     return json.dumps({"random":random.random()})
+
+async def be_low_power():
+    await asyncio.sleep(SLEEP_TIME)
     
 
 asyncio.run(launch_server())
