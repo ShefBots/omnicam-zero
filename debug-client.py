@@ -7,6 +7,7 @@ from protocol import Mode, get_mode_description, COMMUNICATION_PORT
 from basiclog import log, log_nt
 import os
 import argparse
+import json
 
 args = argparse.ArgumentParser(description="Listens for all broadcasts from a sensor server.")
 args.add_argument("-r", "--remote", action="store_true", help="Use this flag to connect to a remote server at 192.168.22.1. If not, localhost is used.")
@@ -41,9 +42,10 @@ async def transmission_mode(writer):
 async def listen_mode(reader):
     log("Listening for broadcasted signals...")
     while True:
-        data = (await reader.read(1024)).decode()
+        data = await reader.read(1024)
         if not data:
             break
+        data = json.dumps(json.loads(data.decode()), indent=2)
         log(f"Recieved:\n{data}")
 
     log("Connection closed by server.")
