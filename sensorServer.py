@@ -15,11 +15,9 @@ from basiclog import log
 args = argparse.ArgumentParser(description="Launches a socket server that transmits task-specific sensor data data.")
 args.add_argument("-m", "--mode", type=Mode, default=Mode.TIME, help=f"The mode to start the server in. Specified using the string types of the protocol Mode class (i.e. {','.join([str(m.value) for m in Mode][:-1])} or {str(Mode.STOP.value)})")
 args.add_argument("-r", "--remote", action="store_true", help="Use this flag to host a server at 192.168.22.1 (on the Pi Zero). If not, it is hosted on localhost.")
-args.add_argument("-s", "--sleep-time", type=float, default=1.0, help="When no connections are present, the server will sleep for this many seconds before checking if it needs to do any work again.")
 args = args.parse_args()
 
 SERVER_ADDR = "192.168.22.1" if args.remote else "localhost" 
-SLEEP_TIME = args.sleep_time
 
 mode = args.mode
 active_connections = {} # reader/writer pair for each connection, as named by it's peername

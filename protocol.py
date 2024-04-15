@@ -14,7 +14,6 @@ def get_mode_description(m):
     return {
         Mode.TIME: "Transmits the time sporadically",
         Mode.RANDOM: "Transmits a random number sporadically",
-        #Mode.PAUSE: "Puts the server into a low-CPU 'paused' state. May take up to SLEEP_TIME seconds before waking",
         Mode.TASK_MINESWEEPER: "Starts detecting minesweeper objects",
         Mode.STOP: "Perminently stops the server"
     }[m]
