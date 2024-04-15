@@ -42,9 +42,10 @@ async def transmission_mode(writer):
 async def listen_mode(reader):
     log("Listening for broadcasted signals...")
     while True:
-        data = await reader.read(1024)
+        data = await reader.readline()
         if not data:
             break
+        #log(f"Recieved [RAW]:\n{data}")
         data = json.dumps(json.loads(data.decode()), indent=2)
         log(f"Recieved:\n{data}")
 

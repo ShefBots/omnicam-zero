@@ -8,12 +8,12 @@ from enum import Enum
 import json
 import os
 
-import detectors.minesweeperDetector
+import detectors.minesweeperDetector as minesweeperDetector
 from protocol import Mode, MODE_STRINGS, COMMUNICATION_PORT
 from basiclog import log
 
 args = argparse.ArgumentParser(description="Launches a socket server that transmits task-specific sensor data data.")
-args.add_argument("-m", "--mode", type=Mode, default=Mode.TIME, help=f"The mode to start the server in. Specified using the string types of the protocol Mode class (i.e. {','.join([str(m.value) for m in Mode][:-1])} or {str(Mode.STOP.value)})")
+args.add_argument("-m", "--mode", type=Mode, default=Mode.TIME, help=f"The mode to start the server in. Specified using the string types of the protocol Mode class (i.e. {', '.join([str(m.value) for m in Mode][:-1])} or {str(Mode.STOP.value)})")
 args.add_argument("-r", "--remote", action="store_true", help="Use this flag to host a server at 192.168.22.1 (on the Pi Zero). If not, it is hosted on localhost.")
 args = args.parse_args()
 
@@ -81,7 +81,7 @@ async def transmission_loop():
         # Get the currently required data
         mode_at_start = mode
         log(f"Starting {mode} operation...")
-        data = json.dumps(await tasks[mode]()).encode()
+        data = f"{json.dumps(await tasks[mode]())}\n".encode() # Also adds line-end to indicate end of data
         log("\tOperation finished, transmitting...")
 
         # For each active connection, transmit it (assuming the mode hasn't changed when we reach it)
@@ -105,6 +105,7 @@ async def get_random_number():
     
 async def get_minesweeper_data():
     data = minesweeperDetector.get_data()
+    #await asyncio.sleep(1)
     return data
     
 
