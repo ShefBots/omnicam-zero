@@ -3,28 +3,60 @@
 # Basically just sits and listens to signals indefinitely
 
 import asyncio
-from websockets.sync.client import connect
-from protocol import Mode
+from protocol import Mode, get_mode_description, COMMUNICATION_PORT
+from basiclog import log, log_nt
 import os
 import argparse
 
 args = argparse.ArgumentParser(description="Listens for all broadcasts from a sensor server.")
 args.add_argument("-r", "--remote", action="store_true", help="Use this flag to connect to a remote server at 192.168.22.1. If not, localhost is used.")
-args.add_argument("-s", "--send", type=Mode, default=None, help="Send a control signal at start. Specified using the string types of the protocol Mode class (i.e. {','.join([str(m.value) for m in Mode][:-1])} or {str(Mode.STOP.value)})")
+args.add_argument("-t", "--transmit-mode", action="store_true", help="Use this flag to transmit commands to the server.")
 args = args.parse_args()
 
 SERVER_ADDR = "192.168.22.1" if args.remote else "localhost" 
 print(f"Searching for server target at {SERVER_ADDR}...")
 
-# Send the control signal if specified
-if args.send:
-    with connect(f"ws://{SERVER_ADDR}:1337") as websocket:
-        print(f"Connected to send {args.send} to server at {SERVER_ADDR}...")
-        print(f"Sending control signal {args.send}...")
-        websocket.send(args.send.value)
+async def transmission_mode(writer):
+    # Print transmit info
+    log("Port opened for control signal transmission.")
+    log_nt("Comands:")
+    for m in Mode:
+        log_nt(f"{m.value}: {get_mode_description(m)}")
+    log_nt("exit: Close this debug client's connection.")
+    log_nt()
 
-with connect(f"ws://{SERVER_ADDR}:1337") as websocket:
-    print(f"Connected to server at {SERVER_ADDR}.")
+    # Begin transmission loop
     while True:
-        print(f"Recieved:\n{websocket.recv()}")
+        command = input("> ")
+        if command == "exit":
+            break
+        writer.write(command.encode())
+        await writer.drain()
 
+    log("Closing connection...")
+    writer.close()
+    await writer.wait_closed()
+    log("Connection closed.")
+
+async def listen_mode(reader):
+    log("Listening for broadcasted signals...")
+    while True:
+        data = (await reader.read(1024)).decode()
+        if not data:
+            break
+        log(f"Recieved:\n{data}")
+
+    log("Connection closed by server.")
+
+    
+
+async def main():
+    reader, writer = await asyncio.open_connection(SERVER_ADDR, COMMUNICATION_PORT)
+    log(f"Connection established to server at {SERVER_ADDR}.")
+
+    if(args.transmit_mode):
+        await transmission_mode(writer)
+    else:
+        await listen_mode(reader)
+
+asyncio.run(main())
