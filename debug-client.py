@@ -3,6 +3,7 @@
 # Basically just sits and listens to signals indefinitely
 
 import asyncio
+import websockets
 from protocol import Mode, get_mode_description, COMMUNICATION_PORT
 from basiclog import log, log_nt
 import os
@@ -17,7 +18,7 @@ args = args.parse_args()
 SERVER_ADDR = "192.168.22.1" if args.remote else "localhost" 
 print(f"Searching for server target at {SERVER_ADDR}...")
 
-async def transmission_mode(writer):
+async def transmission_mode(websocket):
     # Print transmit info
     log("Port opened for control signal transmission.")
     log_nt("Comands:")
@@ -27,39 +28,40 @@ async def transmission_mode(writer):
     log_nt()
 
     # Begin transmission loop
-    while True:
-        command = input("> ")
-        if command == "exit":
-            break
-        writer.write(command.encode())
-        await writer.drain()
+    try:
+        while True:
+            command = input("> ")
+            if command == "exit":
+                log("Closing connection...")
+                break
+            await websocket.send(command)
+    except websockets.exceptions.ConnectionClosed:
+        log("Connection closed by server.")
 
-    log("Closing connection...")
-    writer.close()
-    await writer.wait_closed()
-    log("Connection closed.")
+    # Transmission loop's been left, leav the function and let connection collapse
 
-async def listen_mode(reader):
+async def listen_mode(websocket):
     log("Listening for broadcasted signals...")
-    while True:
-        data = await reader.readline()
-        if not data:
-            break
-        #log(f"Recieved [RAW]:\n{data}")
-        data = json.dumps(json.loads(data.decode()), indent=2)
-        log(f"Recieved:\n{data}")
+    try:
+        while True:
+            data = await websocket.recv()
+            data = json.dumps(json.loads(data), indent=2)
+            log(f"Recieved:\n{data}")
+    except websockets.exceptions.ConnectionClosed:
+        # Raised when recv() is called and the connection is closed
+        log("Connection closed by server.")
 
-    log("Connection closed by server.")
-
+    # Transmission loop's been left, leav the function and let connection collapse
     
 
 async def main():
-    reader, writer = await asyncio.open_connection(SERVER_ADDR, COMMUNICATION_PORT)
-    log(f"Connection established to server at {SERVER_ADDR}.")
+    async with websockets.connect(f"ws://{SERVER_ADDR}:{COMMUNICATION_PORT}") as websocket:
+        log(f"Connection established to server at {SERVER_ADDR}.")
+        if(args.transmit_mode):
+            await transmission_mode(websocket)
+        else:
+            await listen_mode(websocket)
+    log("Connection closed.")
 
-    if(args.transmit_mode):
-        await transmission_mode(writer)
-    else:
-        await listen_mode(reader)
 
 asyncio.run(main())
