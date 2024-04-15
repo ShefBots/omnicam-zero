@@ -1,5 +1,5 @@
                       NO-TRAIN GPL LICENSE
-                     Version 1, 14 April 2024
+                   Version 1.1, 15 April 2024
 
 The software found with this license is distributed under the rules of
 the GNU General Public License (Version 3 [29 June 2007], supplied as
@@ -10,11 +10,11 @@ such that new or modified code can be produced or generated without
 requiring the affixation of this license to the generated code.
 
 Any entity, business or individual, who wishes to use the source code
-of this software product must affix this (and the associated GNU GPL)
-license to generated or otherwise produced code that has been created
-using the source code provided here.
+or any text contained within this repository must affix this (and the
+associated GNU GPL) license to generated or otherwise produced code that
+has been created using the source code provided here.
 
-Rational:
+Rationale:
 The GNU GPL license permits use of source code for any purpose, provided
 that suitable steps are taken to ensure that the net good achieved by that
 code is not locked behind a single company or individual. To allow modern
