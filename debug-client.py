@@ -4,18 +4,18 @@
 
 import asyncio
 import websockets
-from protocol import Mode, get_mode_description, COMMUNICATION_PORT
+from protocol import Mode, get_mode_description, COMMUNICATION_PORT, REMOTE_ADDR
 from basiclog import log, log_nt
 import os
 import argparse
 import json
 
 args = argparse.ArgumentParser(description="Listens for all broadcasts from a sensor server.")
-args.add_argument("-r", "--remote", action="store_true", help="Use this flag to connect to a remote server at 192.168.22.1. If not, localhost is used.")
+args.add_argument("-r", "--remote", action="store_true", help=f"Use this flag to connect to a remote server at {REMOTE_ADDR}. If not, localhost is used.")
 args.add_argument("-t", "--transmit-mode", action="store_true", help="Use this flag to transmit commands to the server.")
 args = args.parse_args()
 
-SERVER_ADDR = "192.168.22.1" if args.remote else "localhost" 
+SERVER_ADDR = REMOTE_ADDR if args.remote else "localhost" 
 print(f"Searching for server target at {SERVER_ADDR}...")
 
 async def transmission_mode(websocket):

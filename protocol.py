@@ -1,6 +1,7 @@
 from enum import Enum
 
 COMMUNICATION_PORT = 1337
+REMOTE_ADDR = "192.168.22.1"
 
 class Mode(Enum):
     TIME = "T" # Transmits the time sporadically
