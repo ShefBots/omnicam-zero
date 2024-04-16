@@ -29,7 +29,7 @@ options:
 ```
 Actual challenge-specific data acquiring routines are found in the "detectors" folder.
 
-## debug-client.py
+## debug-client.py, debug-client-threads.py
 A simple debuging client to observe and interact with the socket connection. It is recommended that two instances of this are opened if actively being used for debugging: one with `-t` and one without. Again, `-r` connects to 192.168.22.1, while without it connects to localhost.
 
 ```
@@ -43,6 +43,7 @@ options:
                        localhost is used.
   -t, --transmit-mode  Use this flag to transmit commands to the server.
 ```
+One uses the asyncio API, the other uses the threads API.
 
 ## retrieve-capture.sh
 A bash scrip to autonomously connect to the omnicam at 192.168.22.1, take a picture using the "rpicam-jpeg" utility app, copy it locally and then display it full-screen using feh:
