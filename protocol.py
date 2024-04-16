@@ -17,3 +17,24 @@ def get_mode_description(m):
         Mode.TASK_MINESWEEPER: "Starts detecting minesweeper objects",
         Mode.STOP: "Perminently stops the server"
     }[m]
+
+def get_mode_data_format(m):
+    return {
+        Mode.TIME:
+"""
+{
+    "datetime": "YYYY-MM-DD HH:MM:SS.SSSSSS"
+}
+""",
+        Mode.RANDOM:
+"""
+{
+    "random": A random number between 0 and 1
+}
+""",
+        Mode.TASK_MINESWEEPER:
+"""
+DATA FORMAT CURRENTLY UNDEFINED.
+""",
+        Mode.STOP: "TRANSMITS NO DATA"
+    }[m]
