@@ -4,6 +4,7 @@
 
 import asyncio
 import websockets
+from websockets.exceptions import InvalidHandshake
 from protocol import Mode, get_mode_description, COMMUNICATION_PORT, REMOTE_ADDR
 from basiclog import log, log_nt
 import os
@@ -28,30 +29,19 @@ async def transmission_mode(websocket):
     log_nt()
 
     # Begin transmission loop
-    try:
-        while True:
-            command = input("> ")
-            if command == "exit":
-                log("Closing connection...")
-                break
-            await websocket.send(command)
-    except websockets.exceptions.ConnectionClosed:
-        log("Connection closed by server.")
-
-    # Transmission loop's been left, leav the function and let connection collapse
+    while True:
+        command = input("> ")
+        if command == "exit":
+            log("Closing connection...")
+            break
+        await websocket.send(command)
 
 async def listen_mode(websocket):
     log("Listening for broadcasted signals...")
-    try:
-        while True:
-            data = await websocket.recv()
-            data = json.dumps(json.loads(data), indent=2)
-            log(f"Recieved:\n{data}")
-    except websockets.exceptions.ConnectionClosed:
-        # Raised when recv() is called and the connection is closed
-        log("Connection closed by server.")
-
-    # Transmission loop's been left, leav the function and let connection collapse
+    while True:
+        data = await websocket.recv()
+        data = json.dumps(json.loads(data), indent=2)
+        log(f"Recieved:\n{data}")
     
 
 async def main():
@@ -63,6 +53,8 @@ async def main():
             else:
                 await listen_mode(websocket)
         log("Connection closed.")
+    except websockets.exceptions.ConnectionClosed:
+        log("Connection closed by server.")
     except ConnectionRefusedError as e:
         log("Connection refused by server. Check the server's status (and/or HOST LOCATION) and try again.")
     except TimeoutError as e:
