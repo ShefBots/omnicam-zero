@@ -16,7 +16,7 @@ import protocol
 from basiclog import log
 
 args = argparse.ArgumentParser(description="Launches a socket server that transmits task-specific sensor data data.")
-args.add_argument("-m", "--mode", type=Mode, default=Mode.TIME, help=f"The mode to start the server in. Specified using the string types of the protocol Mode class (i.e. {', '.join([str(m.value) for m in Mode][:-1])} or {str(Mode.STOP.value)})")
+args.add_argument("-m", "--mode", type=Mode, default=Mode.TIME, help=f"The mode to start the server in. Specified using the string types of the protocol Mode class. Defaults to 'T'", choices=[m.value for m in Mode])
 args.add_argument("-r", "--remote", action="store_true", help="Use this flag to host a server at 192.168.22.1 (on the Pi Zero). If not, it is hosted on localhost and placeholder data will be used instead of camera data.")
 args.add_argument("-p", "--explain-mode-protocols", action="store_true", help="Prints out descriptions of the data that each transmission mode produces.")
 args = args.parse_args()
