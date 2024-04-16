@@ -9,6 +9,9 @@ class Mode(Enum):
     TASK_MINESWEEPER = "M" # Starts detecting minesweeper objects
     STOP = "S" # (the last one) Perminently stops the server
 
+    def __str__(self):
+        return self.value
+
 MODE_STRINGS = [mode.value for mode in Mode]
 
 def get_mode_description(m):
