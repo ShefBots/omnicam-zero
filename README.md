@@ -50,3 +50,6 @@ A bash scrip to autonomously connect to the omnicam at 192.168.22.1, take a pict
 ```
 $ sh ./retrieve-capture.sh <name to save retrieved file as (sans ".jpg")>
 ```
+
+# TODO
+- [ ] Check again that new implementation works on hardware
