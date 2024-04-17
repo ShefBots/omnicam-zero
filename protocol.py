@@ -1,5 +1,7 @@
 from enum import Enum
 from functools import reduce
+from detectors import minesweeperDetector, lavaPalavaDetector, ecoDisasterDetector
+import json
 
 COMMUNICATION_PORT = 1337
 REMOTE_ADDR = "192.168.22.1"
@@ -31,29 +33,17 @@ _mode_to_description = {
 get_mode_description = lambda m: _mode_to_description[m]
 
 def get_mode_data_format(m):
-    return {
-        Mode.TIME:
-"""
-{
-    "datetime": "YYYY-MM-DD HH:MM:SS.SSSSSS"
-}
-""",
-        Mode.RANDOM:
-"""
-{
-    "random": A random number between 0 and 1
-}
-""",
-        Mode.TASK_MINESWEEPER:
-"""
-DATA FORMAT CURRENTLY UNDEFINED.
-""",
-        Mode.TASK_LAVA_PALAVA:
-"""
-DATA FORMAT CURRENTLY UNDEFINED.
-""",
-        Mode.TASK_ECO_DISASTER:
-"""
-DATA FORMAT CURRENTLY UNDEFINED.
-""",
-    }[m]
+    indent = 2
+    match m:
+        case Mode.TIME:
+            f = {"datetime": "YYYY-MM-DD HH:MM:SS.SSSSSS"}
+            return json.dumps(f, indent=indent)
+        case Mode.RANDOM:
+            f = {"random": "A random number between 0 and 1"}
+            return json.dumps(f, indent=indent)
+        case Mode.TASK_MINESWEEPER:
+            return json.dumps(minesweeperDetector.get_data_format_info(), indent=indent)
+        case Mode.TASK_LAVA_PALAVA:
+            return json.dumps(lavaPalavaDetector.get_data_format_info(), indent=indent)
+        case Mode.TASK_ECO_DISASTER:
+            return json.dumps(ecoDisasterDetector.get_data_format_info(), indent=indent)
