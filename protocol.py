@@ -9,6 +9,8 @@ class Mode(Enum):
     TIME = "T" # Transmits the time sporadically
     RANDOM = "R" # Transmits a random number sporadically
     TASK_MINESWEEPER = "M" # Starts detecting minesweeper objects
+    TASK_LAVA_PALAVA = "L" # Starts detecting an offset line
+    TASK_ECO_DISASTER = "E" # Starts detecting barrels and end goals and stuff
     STOP = "S" # (the last one) Perminently stops the server
 
     def __str__(self):
