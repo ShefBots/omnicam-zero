@@ -33,7 +33,7 @@ args = args.parse_args()
 
 if args.explain_mode_protocols:
     print("Modes:")
-    for mode in [m for m in Mode][:-1]:
+    for mode in [m for m in Mode]:
         title = f"{mode} ({mode.value})" 
         print(title)
         print("=" * len(title))
