@@ -11,7 +11,7 @@ import os
 import traceback
 
 import detectors.minesweeperDetector as minesweeperDetector
-from protocol import Mode, MODE_STRINGS, COMMUNICATION_PORT, REMOTE_ADDR
+from protocol import Mode, MODE_STRINGS, COMMUNICATION_PORT, REMOTE_ADDR, MODE_IDENTIFIER_INDICATOR
 import protocol
 from basiclog import log
 
@@ -77,7 +77,7 @@ async def register(websocket):
             mode = Mode(data)
     except websockets.exceptions.ConnectionClosed:
         # Raised when recv() is called and the connection is closed
-        log("Connection from {peername} closed by client.")
+        log(f"Connection from {peername} closed by client.")
 
     try:
         await websocket.wait_closed()
@@ -104,11 +104,14 @@ async def transmission_loop():
             # Get the currently required data
             mode_at_start = mode
             log(f"Starting {mode} operation...")
-            data = f"{json.dumps(await tasks[mode]())}\n".encode() # Also adds line-end to indicate end of data
+            data = await tasks[mode]()
+            data[MODE_IDENTIFIER_INDICATOR] = mode_at_start.value
+            data = f"{json.dumps(data)}"
             log("\tOperation finished, transmitting...")
 
-            # Broadcast the data to all active connections
-            websockets.broadcast(connectiongs, data)
+            # Broadcast the data to all active connections if the mode is still the same
+            if(mode_at_start == mode):
+                websockets.broadcast(connectiongs, data)
     except Exception as e:
         log("ERROR: CRITICAL EXCEPTION IN TRANSMISSION LOOP:")
         log(traceback.format_exc())

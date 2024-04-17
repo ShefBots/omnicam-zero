@@ -3,6 +3,8 @@ from enum import Enum
 COMMUNICATION_PORT = 1337
 REMOTE_ADDR = "192.168.22.1"
 
+MODE_IDENTIFIER_INDICATOR = "M" # Name of field affixed to every transmission that indicates mode
+
 class Mode(Enum):
     TIME = "T" # Transmits the time sporadically
     RANDOM = "R" # Transmits a random number sporadically
