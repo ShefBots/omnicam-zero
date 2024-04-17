@@ -10,7 +10,7 @@ import json
 import os
 import traceback
 
-import detectors.minesweeperDetector as minesweeperDetector
+from detectors import lavaPalavaDetector, ecoDisasterDetector, minesweeperDetector
 from protocol import Mode, MODE_STRINGS, COMMUNICATION_PORT, REMOTE_ADDR, MODE_IDENTIFIER_INDICATOR
 import protocol
 from basiclog import log
@@ -93,7 +93,9 @@ async def transmission_loop():
     tasks = {
                 Mode.TIME: get_time_data,
                 Mode.RANDOM: get_random_number,
-                Mode.TASK_MINESWEEPER: get_minesweeper_data
+                Mode.TASK_MINESWEEPER: get_minesweeper_data,
+                Mode.TASK_LAVA_PALAVA: get_lava_palava_data,
+                Mode.TASK_ECO_DISASTER: get_eco_disaster_data,
             }
 
     try:
@@ -126,8 +128,20 @@ async def get_random_number():
     
 async def get_minesweeper_data():
     data = minesweeperDetector.get_data()
-    await asyncio.sleep(0.01) # TODO: WITHOUT THIS, THE SERVER CRASHES
+    await asyncio.sleep(0.01) # Needed so that the server has some time to recieve the data
     return data
+
+async def get_lava_palava_data():
+    data = lavaPalavaDetector.get_data()
+    await asyncio.sleep(0.01) # Needed so that the server has some time to recieve the data
+    return data
+
+async def get_eco_disaster_data():
+    data = ecoDisasterDetector.get_data()
+    await asyncio.sleep(0.01) # Needed so that the server has some time to recieve the data
+    return data
+
+
     
 
 asyncio.run(launch_server())
