@@ -53,4 +53,7 @@ $ sh ./retrieve-capture.sh <name to save retrieved file as (sans ".jpg")>
 ```
 
 # TODO
-- [ ] Check again that new implementation works on hardware
+- [X] Check again that new implementation works on hardware
+- [ ] Get camera data into detectors
+- [ ] Run detectors
+- [ ] Think about using threads instead of asyncio to avoid requiring pause section on detectors.
