@@ -128,7 +128,7 @@ async def get_random_number():
     
 async def get_minesweeper_data():
     data = minesweeperDetector.get_data()
-    await asyncio.sleep(0.01) # Needed so that the server has some time to recieve the data
+    await asyncio.sleep(1.4) # Needed so that the server has some time to recieve the data
     return data
 
 async def get_lava_palava_data():
