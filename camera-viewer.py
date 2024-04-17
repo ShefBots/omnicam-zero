@@ -1,4 +1,5 @@
 from picamera2 import Picamera2, Preview
+import time
 import os
 
 # Create a place to store images
