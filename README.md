@@ -3,7 +3,19 @@ The Pi-Zero side of the sensor system for the omnicam communication platform.
 
 This repository contains a the actual programs to run on-hardware as well as some other tools for debugging and configuration.
 
-## sensorServer.py
+## Folder Structure
+
+### Root
+Where all the main executables are stored
+
+### detectors
+Where all the individual classes exist that handle image processing to detect task-specific semantic elements
+
+### configuration-images
+When programs relating to image caputre, image configuration or else are run, images are generally stored here.
+
+## Executable Scripts
+### sensorServer.py
 The actual server. When run with `-r` it is expected to be running on the real-world hardware at 192.168.22.1.
 It is a websocket server with a simple set of one-character commands for switching modes.
 Depending on it's mode, it'll transmit to all connected clients data suitable to that mode.
@@ -29,7 +41,7 @@ options:
 ```
 Actual challenge-specific data acquiring routines are found in the "detectors" folder.
 
-## debug-client.py, debug-client-threads.py
+### debug-client.py, debug-client-threads.py
 A simple debuging client to observe and interact with the socket connection. It is recommended that two instances of this are opened if actively being used for debugging: one with `-t` and one without. Again, `-r` connects to 192.168.22.1, while without it connects to localhost.
 
 ```
@@ -45,12 +57,17 @@ options:
 ```
 One uses the asyncio API, the other uses the threads API.
 
-## retrieve-capture.sh
+### retrieve-capture.sh
 A bash scrip to autonomously connect to the omnicam at 192.168.22.1, take a picture using the "rpicam-jpeg" utility app, copy it locally and then display it full-screen using feh:
 
 ```
 $ sh ./retrieve-capture.sh <name to save retrieved file as (sans ".jpg")>
 ```
+
+Image save file paths are relative to `configuration-images/retrieved-captures/`.
+
+### install-rpi-dependencies.sh
+A bash script to only be used on a raspberry pi zero to install the required python3 dependencies. I use this because python on the rpi0 is managed, and I figure retrieving the managed wheels is a better approach.
 
 # TODO
 - [X] Check again that new implementation works on hardware
