@@ -1,16 +1,32 @@
 import libcamera
-from picamera2 import Picamera2, Preview
 import time
-import os
-#from utils import CONFIG_IMAGES_PATH
+#from cameraUtils import CONFIG_IMAGES_PATH, HARDWARE_CONTROLS_FILENAME, FORMAT_CONTROLS_FILENAME
+import cameraUtils
 import numpy as np
 import json
 from pprint import *
+import argparse
+import os
 
-# Create a place to store images
-#os.makedirs(CONFIG_IMAGES_PATH, exist_ok=True)
 
+args = argparse.ArgumentParser(description="Walks the user through configuring a camera for use with the omnicam-zero sensor server. Make sure you're running this through X-forwarding SSH (ssh -X).")
+args.add_argument("-i", "--image", type=str, help="Specify a path to an image to use as the basis of the configuration wizard. If this is used, only a cropping configuration will be generated.")
+args = args.parse_args()
+
+if args.image not None:
+    from picamera2 import Picamera2, Preview
+
+
+# Create a place to store images if it's not there already
+cameraUtils.ensure_configuration_path()
+
+# Create backups if the file exist
+cameraUtils.backup_files_if_exist()
+
+
+# Initialise the camera
 picam2 = Picamera2()
+
 
 print("SENSOR MODES:")
 mode = picam2.sensor_modes[1]
@@ -18,9 +34,13 @@ pprint(picam2.sensor_modes)
 
 print("CAMERA CONTROLS:")
 pprint(picam2.camera_controls)
+print(json.dumps(picam2.camera_controls, indent=2))
+pprint(json.loads(json.dumps(picam2.camera_controls)))
 
 print("CAMERA PROPERTIES:")
 pprint(picam2.camera_properties) # cam_props["pixelArraySize"] indicates the maximum size
+
+config = cameraUtils.getDefaultFormatConfig()
 
 target_size = (240,240)
 
@@ -70,7 +90,7 @@ picam2.start()
 
 
 time.sleep(2) # Let the camera stabalize
-#picam2.capture_file(os.path.join(CONFIG_IMAGES_PATH,"test-image.jpg"))
+picam2.capture_file(os.path.join(CONFIG_IMAGES_PATH,"test-image.jpg"))
 
 time.sleep(20)
 
