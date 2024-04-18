@@ -11,8 +11,9 @@ Where all the main executables are stored
 ### detectors
 Where all the individual classes exist that handle image processing to detect task-specific semantic elements
 
-### configuration-images
+### camera-configuration
 When programs relating to image caputre, image configuration or else are run, images are generally stored here.
+Also stored here are generated camera configuration files created by the camera setup wizard.
 
 ## Executable Scripts
 ### sensorServer.py
