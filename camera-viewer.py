@@ -2,13 +2,13 @@ import libcamera
 from picamera2 import Picamera2, Preview
 import time
 import os
-from utils import CONFIG_IMAGES_PATH
+#from utils import CONFIG_IMAGES_PATH
 import numpy as np
 import json
 from pprint import *
 
 # Create a place to store images
-os.makedirs(CONFIG_IMAGES_PATH, exist_ok=True)
+#os.makedirs(CONFIG_IMAGES_PATH, exist_ok=True)
 
 picam2 = Picamera2()
 
@@ -70,7 +70,7 @@ picam2.start()
 
 
 time.sleep(2) # Let the camera stabalize
-picam2.capture_file(os.path.join(CONFIG_IMAGES_PATH,"test-image.jpg"))
+#picam2.capture_file(os.path.join(CONFIG_IMAGES_PATH,"test-image.jpg"))
 
 time.sleep(20)
 

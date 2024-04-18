@@ -1,5 +1,4 @@
 import libcamera
-from picamera2 import Picamera2, Preview
 import time
 #from cameraUtils import CONFIG_IMAGES_PATH, HARDWARE_CONTROLS_FILENAME, FORMAT_CONTROLS_FILENAME
 import cameraUtils
@@ -11,8 +10,11 @@ import os
 
 
 args = argparse.ArgumentParser(description="Walks the user through configuring a camera for use with the omnicam-zero sensor server. Make sure you're running this through X-forwarding SSH (ssh -X).")
-#args.add_argument
+args.add_argument("-i", "--image", type=str, help="Specify a path to an image to use as the basis of the configuration wizard. If this is used, only a cropping configuration will be generated.")
 args = args.parse_args()
+
+if args.image not None:
+    from picamera2 import Picamera2, Preview
 
 
 # Create a place to store images if it's not there already
