@@ -1,22 +1,22 @@
 import os
 import shutil
-from Enum import Enum
+from enum import Enum
 
 class ConfigType(Enum):
     HW = 1
     FMT = 2
+
+class FormatConfigFields(Enum):
+    BUFFER_COUNT = "buffer_count"
+    QUEUE = "use_queue"
+    MAIN_SIZE = "main_size"
+    LORES_SIZE = "lores_size"
 
 CONFIG_IMAGES_PATH = "camera-configuration"
 HARDWARE_CONTROLS_FILENAME = "hardware-configuration.json"  # Stores the physical hardware settings (wb, exposure, etc)
 FORMAT_CONTROLS_FILENAME = "formatting-configuration.json" # Stores the hardware capture size, crop and formatting configuration
 #CROP_CONFIG_FILENAME = "crop-configuration.json" # Stores the cropping and masking configuration
 
-FMT_CONFIG_FIELDS = {
-    BUFFER_COUNT:"buffer_count",
-    QUEUE:"use_queue",
-    MAIN_SIZE:"main_size",
-    LORES_SIZE:"lores_size",
-    
 
 CROP_SIZE = (240,240)
 PERFECT_CROP_IMG_FILENAME = "crop-mask.png"
