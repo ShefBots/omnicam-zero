@@ -41,12 +41,12 @@ if ask_b("Would you like to see the sensor modes, controls and properties?"):
     print("\nCAMERA PROPERTIES:")
     pprint(camera_properties) # cam_props["pixelArraySize"] indicates the maximum size
 
-loaded_format_config = None
+json_format_config = None
 format_config = None
 
 if ask_b("Would you like to attempt to load a formatting configuration file?"):
-    loaded_format_config = cameraUtils.get_config_data(ConfigType.FMT)
-    if loaded_format_config == None:
+    json_format_config = cameraUtils.get_config_data(ConfigType.FMT)
+    if json_format_config == None:
         print("Error: No formatting config file found.")
 
 def get_preview_size(main_size, prev_size):
@@ -60,7 +60,7 @@ def configure_lores_to_preview(config, prev_size):
     new_prev_size = get_preview_size(current, prev_size)
     config["lores"]["size"] = new_prev_size
 
-def get_config_from_format_config(fmt_config, align=False, preview=False):
+def get_config_from_json_format_config(fmt_config, align=False, preview=False):
     out = picam2.create_preview_configuration(buffer_count=fmt_config[FormatConfigFields.BUFFER_COUNT],
                                               queue=fmt_config[FormatConfigFields.QUEUE],
                                               main={"size": fmt_config[FormatConfigFields.MAIN_SIZE]},#, format:"YUV420"},
@@ -74,21 +74,29 @@ def get_config_from_format_config(fmt_config, align=False, preview=False):
         configure_lores_to_preview(out, args.preview_size)
     return out
 
-if loaded_format_config == None:
+def get_json_format_config_from_config(config):
+    json_format_config = {
+                              FormatConfigFields.BUFFER_COUNT:config["buffer_count"],
+                              FormatConfigFields.QUEUE:config["queue"],
+                              FormatConfigFields.MAIN_SIZE:config["main"]["size"],
+                              FormatConfigFields.LORES_SIZE:config["lores"]["size"]
+                           }
+
+if json_format_config == None:
     print("Creating default formatting config file...")
     max_size = camera_properties["PixelArraySize"]
     max_size = (1000,1000) # We'll just use this instead, because the max size kills the pi0
     #preview_size = (min(max_size[0],args.preview_size[0]), min(max_size[1],args.preview_size[1])) if args.preview_size else max_size
-    loaded_format_config = {
+    json_format_config = {
                               FormatConfigFields.BUFFER_COUNT:4,
                               FormatConfigFields.QUEUE:False,
                               FormatConfigFields.MAIN_SIZE:max_size,
                               FormatConfigFields.LORES_SIZE:get_preview_size(max_size, args.preview_size),
                            }
-    format_config = get_config_from_format_config(loaded_format_config, True, True)
+    format_config = get_config_from_json_format_config(json_format_config, True, True)
 
 else:
-    format_config = get_config_from_format_config(loaded_format_config)
+    format_config = get_config_from_json_format_config(json_format_config)
 
 # Formatting phase 1 loop
 print("Now starting formatting phase 1 configuration...")
@@ -104,11 +112,11 @@ while True:
     new_config = {}
     while True:
         new_size = tuple([int(n) for n in input("Enter a new size as two ints: ").split(" ")[:2]])
-        new_loaded_format_config = copy.deepcopy(loaded_format_config)
-        new_loaded_format_config[FormatConfigFields.MAIN_SIZE] = new_size
-        new_loaded_format_config[FormatConfigFields.LORES_SIZE] = get_preview_size(new_loaded_format_config[FormatConfigFields.MAIN_SIZE], args.preview_size)
+        new_json_format_config = copy.deepcopy(json_format_config)
+        new_json_format_config[FormatConfigFields.MAIN_SIZE] = new_size
+        new_json_format_config[FormatConfigFields.LORES_SIZE] = get_preview_size(new_json_format_config[FormatConfigFields.MAIN_SIZE], args.preview_size)
 
-        new_format_config = get_config_from_format_config(new_loaded_format_config, align=True, preview=True)
+        new_format_config = get_config_from_json_format_config(new_json_format_config, align=True, preview=True)
         print("New generated config:")
         pprint(new_format_config)
 
@@ -123,7 +131,15 @@ while True:
     
 
 print("Phase 1 complete.")
+print(f"Main image size is set and optimised to {format_config['main']['size']}.We will now configure crop size.")
 
+# Convert it back into a json config, now that we know the main size is optimised
+json_format_config = get_json_format_config_from_config(format_config)
+
+# Load the crop mask
+crop_mask = cameraUtils.load_crop_mask(edge_highlight=True)
+
+# Lores MUST be the same aspect ratio as the main image, but scaled so that the circle aligns.
 
 
 

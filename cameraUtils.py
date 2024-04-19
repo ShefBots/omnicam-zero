@@ -19,7 +19,11 @@ FORMAT_CONTROLS_FILENAME = "formatting-configuration.json" # Stores the hardware
 
 
 CROP_SIZE = (240,240)
-PERFECT_CROP_IMG_FILENAME = "crop-mask.png"
+PERFECT_CROP_IMG_FILENAME = "crop-mask.png" # This just lives out in the open
+
+def load_crop_mask(edge_highlight=False):
+    img = imageio.imread(PERFECT_CROP_IMG_FILENAME)
+    return numpy.asarray(img)
 
 # Full paths
 _HW_CONTROLS_PATH = os.path.join(CONFIG_IMAGES_PATH, HARDWARE_CONTROLS_FILENAME)
