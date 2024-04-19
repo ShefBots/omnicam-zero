@@ -1,6 +1,6 @@
 import time
 from picamera2 import Picamera2, Preview
-from cameraUtils import ConfigType, FormatConfigFields
+from cameraUtils import ConfigType, FormatConfigFields, CropConfigFields
 import cameraUtils
 import numpy as np
 import json
@@ -109,7 +109,7 @@ while True:
     if ask_b(f"Main size is at {format_config['main']['size']}. Is this okay?", invert=True):
         picam2.close()
         break
-    new_config = {}
+    
     while True:
         new_size = tuple([int(n) for n in input("Enter a new size as two ints: ").split(" ")[:2]])
         new_json_format_config = copy.deepcopy(json_format_config)
@@ -137,7 +137,62 @@ print(f"Main image size is set and optimised to {format_config['main']['size']}.
 json_format_config = get_json_format_config_from_config(format_config)
 
 # Load the crop mask
-crop_mask = cameraUtils.load_crop_mask(edge_highlight=True)
+crop_mask = cameraUtils.load_crop_mask()
+
+# Convert to a mask that works as an overlay (i.e. this will be a sub-section of an overlay object
+# TODO: Make this not just semiopaque and white but an actual outline
+crop_overlay_subsection = np.zeros((crop_mask.shape[0], crop_mask.shape[1], 4), dtype=np.uint8)
+for x in range(crop_mask.shape[0]):
+    for y in range(crop_mask.shape[1]):
+        crop_overlay_subsection[x,y][3] = 128 if crop_mask[x,y]>128 else 0
+
+# Get crop controls
+crop_config = None
+if ask_b("Would you like to attempt to crop configuration file?"):
+    crop_config = cameraUtils.get_config_data(ConfigType.CRP)
+    if crop_config == None:
+        print("Error: No crop config file found.")
+
+if crop_config == None:
+    # Create default crop config
+    crop_config[CropConfigFields.CROP_POSITION] = (0,0)
+
+while True:
+    picam2.close()
+    picam2 = Picamera2()
+
+    # Generate a new config, this time optimising both the main and lores streams
+    #TODO: THIS IS WRONG. LORES SHOULDN'T BE OPTIMISED OR ALIGNED (and main already is) BECAUSE IT NEEDS
+    #      TO BE AS CLOSE AS POSSIBLE TO A MULTIPLE OF MAIN
+    new_config = get_config_from_json_format_config(json_format_config, align=True)
+
+    picam2.configure(new_config)
+    picam2.start_preview(Preview.QT) # For transmitting over the network when connected over ssh -X
+    picam2.start()
+
+
+    # Set the overlay with the crop mask pasted in at CROP_POS from crop_config
+    overlay = crop_overlay_subsection # TODO: This should be a single image the size of lores, with crop mask pasted in at CROP_POS
+
+    # Maybe crop overlay can be moved here?
+
+    picam2.set_overlay(overlay)
+    if ask_b(f"Does the mask align correctly?", invert=True):
+        picam2.close()
+        break
+
+    while True:
+        # TODO: allow user to adjust CROP_POS and low-res size by changing json_format_config (note low-res size will be optimised)
+        # When they change low-res it should just be a scale size compared to main
+        input("some controls (btw you're in an infinite loop)")
+    print("Loading new size...")
+    picam2.close()
+
+# We now finally have a json format config file with optimised output in main and lores set to a sane size
+json_format_config = get_json_format_config_from_config(format_config)
+# We also have a configured crop mask config in crop_config for that format config
+
+# TODO: SAVE the 
 
 # Lores MUST be the same aspect ratio as the main image, but scaled so that the circle aligns.
 
