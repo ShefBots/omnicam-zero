@@ -9,6 +9,11 @@ import argparse
 import os
 import copy
 
+print("Importing OpenCV2, please wait...")
+import cv2
+
+SNAPSHOT_NAME = "snapshot.png"
+
 
 args = argparse.ArgumentParser(description="Walks the user through configuring a camera for use with the omnicam-zero sensor server. Make sure you're running this through X-forwarding SSH (ssh -X). Must be run on pi zero.")
 args.add_argument("-s", "--preview-size", type=int, nargs=1, default=840, help="The size of the width of the preview window (used as a lores downscale during phase 1 configuration). Default: 840")
@@ -309,10 +314,40 @@ format_config = get_config_from_json_format_config(picam2, json_format_config)
 crop_config = cameraUtils.get_config_data(ConfigType.CRP)
 picam2.close()
 
+print("Loaded CROP and FORMAT configs from file.")
 print("FORMAT:")
 pprint(format_config)
 print("\nCROP:")
 pprint(crop_config)
+
+if ask_b("Would you like to take a cv2 photo?"):
+    picam2 = Picamera2()
+
+    # Generate a config from the json format config image, making sure not to align or preview anything.
+    new_config = get_config_from_json_format_config(picam2, json_format_config, align=False, preview=False)
+    picam2.configure(new_config)
+    picam2.start_preview(Preview.NULL) # We don't want to transmit the data anywhere
+    picam2.start()
+    time.sleep(2) # Sleep for a bit to wait for things to settle
+
+    # Take the photo, convert it into RGB space
+    yuv420 = picam2.capture_array()
+    rgb = cv2.cvtColor(yuv420, cv2.COLOR_YUV420p2RGB)
+    crop_pos = crop_config[CropConfigFields.CROP_POSITION.value]
+
+    # Crop it down to CROP_SIZE x CROP_SIZE
+    rgb = rgb[crop_pos[0]:crop_pos[0]+CROP_SIZE, crop_pos[1]:crop_pos[1]+CROP_SIZE]
+
+    # ...apply the crop mask? TODO
+
+    # Save the image
+    save_path = os.path.join(cameraUtils.CONFIG_IMAGES_PATH, SNAPSHOT_NAME)
+    print(f"Saving image as {save_path}...")
+    cv2.imwrite(save_path, rgb)
+    print("Saved!")
+
+    picam2.stop()
+
 
 print("Now on to camera hardware configuration!")
 
