@@ -349,7 +349,6 @@ if ask_b("Would you like to take a cv2 photo?"):
                 print("Error: mask image does not exist. Skipping")
 
     yuv420 = picam2.capture_array("lores")
-    #img = masking.convert_crop_and_mask_yuv420(yuv420, masking.make_bool_mask(mask), crop_config, (255,0,0))
     img = masking.convert_and_crop_yuv420(yuv420, crop_config)
 
     if mask is not None:

@@ -13,6 +13,7 @@ def load_crop_mask(path):
     img = imageio.imread(path)
     return np.asarray(img)
 
+# NOTE: mask MUST be only 1 dimensional
 def make_bool_mask(mask_img):
     # If the mask image didn't exist, just allow that for continuous pass-through:
     if mask_img is None:
