@@ -316,8 +316,12 @@ pprint(crop_config)
 
 print("Now on to camera hardware configuration!")
 
-# Lores MUST be the same aspect ratio as the main image, but scaled so that the circle aligns.
+# Use picam2.capture_request(flush=True) to ensure the photo is one that was taken at or *after* the function is called.
 
+
+# For capturing:
+#yuv420 = picam2.capture_array()
+#rgb = cv2.cvtColor(yuv420, cv2.COLOR_YUV420p2RGB)
 
 
 ###### OLD
