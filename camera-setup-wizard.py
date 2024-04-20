@@ -1,7 +1,7 @@
 import time
 from picamera2 import Picamera2, Preview
-from cameraUtils import ConfigType, FormatConfigFields, CropConfigFields, CROP_SIZE
-import cameraUtils
+from cameraConfigUtils import ConfigType, FormatConfigFields, CropConfigFields
+import cameraConfigUtils
 import numpy as np
 import json
 from pprint import *
@@ -13,7 +13,7 @@ import copy
 SNAPSHOT_NAME = "snapshot.png"
 
 
-args = argparse.ArgumentParser(description=f"Walks the user through configuring a camera for use with the omnicam-zero sensor server. Make sure you're running this through X-forwarding SSH (ssh -X). Must be run on pi zero.\nTo just get a snapshot from the camera (saved as {os.path.join(cameraUtils.CONFIG_IMAGES_PATH, SNAPSHOT_NAME)}, just run `camera-setup-wizard.py -o` then hit yes.")
+args = argparse.ArgumentParser(description=f"Walks the user through configuring a camera for use with the omnicam-zero sensor server. Make sure you're running this through X-forwarding SSH (ssh -X). Must be run on pi zero.\nTo just get a snapshot from the camera (saved as {os.path.join(cameraConfigUtils.CONFIG_IMAGES_PATH, SNAPSHOT_NAME)}, just run `camera-setup-wizard.py -o` then hit yes.")
 args.add_argument("-s", "--preview-size", type=int, nargs=1, default=840, help="The size of the width of the preview window (used as a lores downscale during phase 1 configuration). Default: 840")
 args.add_argument("-m", "--max-size", type=int, nargs=2, default=(1000, 1000), help="When running the formatting config, this is the size the capture starts at. If you're getting crashes due to memory issues. Turn this down. Default: (1500,1500)")
 args.add_argument("-o", "--only-hardware", action="store_true", help="Use this to just load config files and skip all the format and crop configuration.")
@@ -21,8 +21,10 @@ args = args.parse_args()
 
 print("Importing OpenCV2, please wait...")
 import cv2
+import maskingUtils as masking
+from maskingUtils import CROP_SIZE
 
-cameraUtils.ensure_configuration_path()
+cameraConfigUtils.ensure_configuration_path()
 
 if not args.preview_size:
     print("No preview size specified.")
@@ -92,7 +94,7 @@ def setup_format_and_crop(args):
     format_config = None
 
     if ask_b("Would you like to attempt to load a formatting configuration file?"):
-        json_format_config = cameraUtils.get_config_data(ConfigType.FMT)
+        json_format_config = cameraConfigUtils.get_config_data(ConfigType.FMT)
         if json_format_config == None:
             print("Error: No formatting config file found.")
 
@@ -101,7 +103,6 @@ def setup_format_and_crop(args):
         print("Creating default formatting config file...")
         max_size = camera_properties["PixelArraySize"]
         max_size = (min(args.max_size[0],max_size[0]), min(args.max_size[1], max_size[1])) # We'll just use this instead, because the max size kills the pi0
-        #preview_size = (min(max_size[0],args.preview_size[0]), min(max_size[1],args.preview_size[1])) if args.preview_size else max_size
         json_format_config = {
                                   FormatConfigFields.BUFFER_COUNT.value:4,
                                   FormatConfigFields.QUEUE.value:False,
@@ -136,8 +137,8 @@ def setup_format_and_crop(args):
             pprint(new_format_config)
 
             new_size = new_format_config['main']['size']
-            if new_size[0] < cameraUtils.CROP_SIZE or new_size[1] < cameraUtils.CROP_SIZE:
-                print(f"That size is too small! Please supply a size bigger than {cameraUtils.CROP_SIZE}")
+            if new_size[0] < cameraConfigUtils.CROP_SIZE or new_size[1] < cameraConfigUtils.CROP_SIZE:
+                print(f"That size is too small! Please supply a size bigger than {cameraConfigUtils.CROP_SIZE}")
             else:
                 format_config = new_format_config
                 break
@@ -152,7 +153,7 @@ def setup_format_and_crop(args):
     json_format_config = get_json_format_config_from_config(format_config)
 
     # Load the crop mask
-    crop_mask = cameraUtils.load_crop_mask()
+    crop_mask = masking.load_perfect_crop_mask()
 
     ORANGE = (252, 186, 3, 200)
 
@@ -178,7 +179,7 @@ def setup_format_and_crop(args):
 
     crop_config = None
     if ask_b("Would you like to attempt to load the crop configuration file?", invert=True):
-        crop_config = cameraUtils.get_config_data(ConfigType.CRP)
+        crop_config = cameraConfigUtils.get_config_data(ConfigType.CRP)
         # In this situation, the lores size is whatever it was loaded as.
         if crop_config == None:
             print("Error: No crop config file found.")
@@ -300,11 +301,11 @@ def setup_format_and_crop(args):
     pprint(crop_config)
 
     # SAVE the configurations
-    cameraUtils.backup_files_if_exist()
+    cameraConfigUtils.backup_files_if_exist()
 
     print("Saving...")
-    cameraUtils.save_config_data(ConfigType.FMT, json_format_config)
-    cameraUtils.save_config_data(ConfigType.CRP, crop_config)
+    cameraConfigUtils.save_config_data(ConfigType.FMT, json_format_config)
+    cameraConfigUtils.save_config_data(ConfigType.CRP, crop_config)
     print("Saved!")
 
 
@@ -314,9 +315,9 @@ if not args.only_hardware:
     setup_format_and_crop(args)
 
 picam2 = Picamera2()
-json_format_config = cameraUtils.get_config_data(ConfigType.FMT)
+json_format_config = cameraConfigUtils.get_config_data(ConfigType.FMT)
 format_config = get_config_from_json_format_config(picam2, json_format_config)
-crop_config = cameraUtils.get_config_data(ConfigType.CRP)
+crop_config = cameraConfigUtils.get_config_data(ConfigType.CRP)
 picam2.close()
 
 print("Loaded CROP and FORMAT configs from file.")
@@ -336,24 +337,34 @@ if ask_b("Would you like to take a cv2 photo?"):
     time.sleep(2) # Sleep for a bit to wait for things to settle
 
     # Take the photo, convert it into RGB space (and remove alpha)
+    mask = None
+    if ask_b("Would you like to apply the perfect crop mask?", invert=True):
+        mask = masking.load_perfect_crop_mask()
+    elif ask_b("Would you like to apply an arbitrary crop mask?", invert=True):
+            name = input(f"Please enter mask name (within '{cameraConfigUtils.CONFIG_IMAGES_PATH}' folder):")
+            path = os.path.join(cameraConfigUtils.CONFIG_IMAGES_PATH, name)
+            if os.path.exists(path):
+                mask = masking.load_crop_mask(path)
+            else:
+                print("Error: mask image does not exist. Skipping")
+
     yuv420 = picam2.capture_array("lores")
-    #rgb = cv2.cvtColor(np.delete(yuv420, 3, 2), cv2.COLOR_YUV420p2RGB)
-    #rgb = cv2.cvtColor(np.delete(yuv420, 3, 2), cv2.COLOR_YUV420p2RGB)
-    rgb = cv2.cvtColor(yuv420, cv2.COLOR_YUV420p2RGB)
-    crop_pos = crop_config[CropConfigFields.CROP_POSITION.value]
+    #img = masking.convert_crop_and_mask_yuv420(yuv420, masking.make_bool_mask(mask), crop_config, (255,0,0))
+    img = masking.convert_and_crop_yuv420(yuv420, crop_config)
 
-    # Crop it down to CROP_SIZE x CROP_SIZE
-    rgb = rgb[crop_pos[0]:crop_pos[0]+CROP_SIZE, crop_pos[1]:crop_pos[1]+CROP_SIZE]
-
-    # ...apply the crop mask? TODO
+    if mask is not None:
+        print(img.shape)
+        masking.mask_image(img, masking.make_bool_mask(mask), (255,0,0))
 
     # Save the image
-    save_path = os.path.join(cameraUtils.CONFIG_IMAGES_PATH, SNAPSHOT_NAME)
+    save_path = os.path.join(cameraConfigUtils.CONFIG_IMAGES_PATH, SNAPSHOT_NAME)
     print(f"Saving image as {save_path}...")
-    cv2.imwrite(save_path, rgb)
+    cv2.imwrite(save_path, img)
     print("Saved!")
 
+    print("Stopping camera...")
     picam2.stop()
+    print("Stopped!")
 
 
 print("Now on to camera dynamic settings configuration!")
@@ -385,7 +396,7 @@ print("Now on to camera dynamic settings configuration!")
 #print("CAMERA PROPERTIES:")
 #pprint(picam2.camera_properties) # cam_props["pixelArraySize"] indicates the maximum size
 #
-#config = cameraUtils.getDefaultFormatConfig()
+#config = cameraConfigUtils.getDefaultFormatConfig()
 #
 #target_size = (240,240)
 #

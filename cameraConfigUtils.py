@@ -1,7 +1,6 @@
 import os
 import shutil
 from enum import Enum
-import imageio
 import numpy as np
 import json
 
@@ -28,13 +27,6 @@ HARDWARE_CONTROLS_FILENAME = "hardware-configuration.json"  # Stores the physica
 FORMAT_CONTROLS_FILENAME = "formatting-configuration.json" # Stores the hardware capture size and formatting configuration
 CROP_CONTROLS_FILENAME = "crop-configuration.json" # Stores the cropping and masking configuration
 
-
-CROP_SIZE = 240 # The size that crop-mask is (crops are always circular)
-PERFECT_CROP_IMG_FILENAME = "crop-mask.png" # This just lives out in the open
-
-def load_crop_mask():
-    img = imageio.imread(PERFECT_CROP_IMG_FILENAME)
-    return np.asarray(img)
 
 # Full paths
 _HW_CONTROLS_PATH = os.path.join(CONFIG_IMAGES_PATH, HARDWARE_CONTROLS_FILENAME)
@@ -94,9 +86,3 @@ def save_config_data(config_type, config):
 #    out_config["main"] = {"size": fmt["main_size"]}
 #    out_config["lores"] = {"size": fmt["lores_size"]}
 #    return out_config
-
-
-# Saves the important format config data into the FORMAT_CONTROLS_FILE
-def save_format_config(config):
-    #TODO
-    pass
