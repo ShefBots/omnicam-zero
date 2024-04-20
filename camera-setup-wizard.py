@@ -9,17 +9,18 @@ import argparse
 import os
 import copy
 
-print("Importing OpenCV2, please wait...")
-import cv2
 
 SNAPSHOT_NAME = "snapshot.png"
 
 
-args = argparse.ArgumentParser(description="Walks the user through configuring a camera for use with the omnicam-zero sensor server. Make sure you're running this through X-forwarding SSH (ssh -X). Must be run on pi zero.")
+args = argparse.ArgumentParser(description=f"Walks the user through configuring a camera for use with the omnicam-zero sensor server. Make sure you're running this through X-forwarding SSH (ssh -X). Must be run on pi zero.\nTo just get a snapshot from the camera (saved as {os.path.join(cameraUtils.CONFIG_IMAGES_PATH, SNAPSHOT_NAME)}, just run `camera-setup-wizard.py -o` then hit yes.")
 args.add_argument("-s", "--preview-size", type=int, nargs=1, default=840, help="The size of the width of the preview window (used as a lores downscale during phase 1 configuration). Default: 840")
 args.add_argument("-m", "--max-size", type=int, nargs=2, default=(1000, 1000), help="When running the formatting config, this is the size the capture starts at. If you're getting crashes due to memory issues. Turn this down. Default: (1500,1500)")
 args.add_argument("-o", "--only-hardware", action="store_true", help="Use this to just load config files and skip all the format and crop configuration.")
 args = args.parse_args()
+
+print("Importing OpenCV2, please wait...")
+import cv2
 
 cameraUtils.ensure_configuration_path()
 
@@ -145,7 +146,7 @@ def setup_format_and_crop(args):
         
 
     print("Phase 1 complete.")
-    print(f"Main image size is set and optimised to {format_config['main']['size']}.We will now configure crop size.")
+    print(f"Main image size is set and optimised to {format_config['main']['size']}. We will now configure crop size.")
 
     # Convert it back into a json config, now that we know the main size is optimised
     json_format_config = get_json_format_config_from_config(format_config)
@@ -156,7 +157,6 @@ def setup_format_and_crop(args):
     ORANGE = (252, 186, 3, 200)
 
     # Convert to a mask that works as an overlay (i.e. this will be a sub-section of an overlay object
-    # TODO: Make this not just semiopaque and white but an actual outline
     crop_overlay_subsection = np.zeros((crop_mask.shape[0], crop_mask.shape[1], 4), dtype=np.uint8)
     for x in range(1,crop_mask.shape[0]-1):
         for y in range(1,crop_mask.shape[1]-1):
@@ -167,18 +167,6 @@ def setup_format_and_crop(args):
                 crop_overlay_subsection[x,y] = ORANGE
 
     # Get crop controls
-    crop_config = None
-    if ask_b("Would you like to attempt to load the crop configuration file?", invert=True):
-        crop_config = cameraUtils.get_config_data(ConfigType.CRP)
-        if crop_config == None:
-            print("Error: No crop config file found.")
-
-    if crop_config == None:
-        # Create default crop config
-        crop_config = {}
-        crop_config[CropConfigFields.CROP_POSITION.value] = (0,0)
-
-    #main_size = format_config["main"]["size"]
     def get_new_lores_size_for(s, main_size):
         new_lores_size = None
         if(main_size[0] < main_size[1]):
@@ -188,9 +176,24 @@ def setup_format_and_crop(args):
         new_lores_size = tuple([int(n*s) for n in new_lores_size])
         return new_lores_size
 
+    crop_config = None
+    if ask_b("Would you like to attempt to load the crop configuration file?", invert=True):
+        crop_config = cameraUtils.get_config_data(ConfigType.CRP)
+        # In this situation, the lores size is whatever it was loaded as.
+        if crop_config == None:
+            print("Error: No crop config file found.")
+        print("Crop config loaded.")
 
-    # Make Lo-res the smallest it can be to start (crop size)
-    new_lores_size = get_new_lores_size_for(CROP_SIZE, format_config["main"]["size"])
+    if crop_config == None:
+        # Create default crop config
+        crop_config = {}
+        crop_config[CropConfigFields.CROP_POSITION.value] = (0,0)
+        # Make Lo-res the smallest it can be to start (crop size)
+        json_format_config[FormatConfigFields.LORES_SIZE.value] = get_new_lores_size_for(CROP_SIZE, format_config["main"]["size"])
+
+    print("LOADED CROP CONFIG:")
+    pprint(crop_config)
+
 
     # Store the main size for ease of use
     #main_size = json_format_config[FormatConfigFields.MAIN_SIZE.value]
@@ -198,10 +201,12 @@ def setup_format_and_crop(args):
     def update_overlay(lores_size, crop_config):
         overlay = np.zeros((lores_size[0], lores_size[1], 4), dtype=np.uint8)
         crop_pos = crop_config[CropConfigFields.CROP_POSITION.value]
+        print(f"CROP POS: {crop_pos}. CROP_SIZE: {CROP_SIZE}")
         overlay[crop_pos[0]:crop_pos[0]+CROP_SIZE, crop_pos[1]:crop_pos[1]+CROP_SIZE] = crop_overlay_subsection
         picam2.set_overlay(overlay)
 
     new_config = None # Where we'll store the new config
+    new_lores_size = json_format_config[FormatConfigFields.LORES_SIZE.value]
     while True:
         picam2.close()
         picam2 = Picamera2()
@@ -330,8 +335,10 @@ if ask_b("Would you like to take a cv2 photo?"):
     picam2.start()
     time.sleep(2) # Sleep for a bit to wait for things to settle
 
-    # Take the photo, convert it into RGB space
-    yuv420 = picam2.capture_array()
+    # Take the photo, convert it into RGB space (and remove alpha)
+    yuv420 = picam2.capture_array("lores")
+    #rgb = cv2.cvtColor(np.delete(yuv420, 3, 2), cv2.COLOR_YUV420p2RGB)
+    #rgb = cv2.cvtColor(np.delete(yuv420, 3, 2), cv2.COLOR_YUV420p2RGB)
     rgb = cv2.cvtColor(yuv420, cv2.COLOR_YUV420p2RGB)
     crop_pos = crop_config[CropConfigFields.CROP_POSITION.value]
 
@@ -349,7 +356,7 @@ if ask_b("Would you like to take a cv2 photo?"):
     picam2.stop()
 
 
-print("Now on to camera hardware configuration!")
+print("Now on to camera dynamic settings configuration!")
 
 # Use picam2.capture_request(flush=True) to ensure the photo is one that was taken at or *after* the function is called.
 

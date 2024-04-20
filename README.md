@@ -58,7 +58,33 @@ options:
 ```
 One uses the asyncio API, the other uses the threads API.
 
+### camera-setup-wizard.py
+A utility for configuring the pi zero's camera and generating config files for both sensor formatting and cropping (Soon, if we have time: configs for shutter speed and auto-focus).
+
+```
+usage: camera-setup-wizard.py [-h] [-s PREVIEW_SIZE] [-m MAX_SIZE MAX_SIZE] [-o]
+
+Walks the user through configuring a camera for use with the omnicam-zero sensor server. Make sure
+you're running this through X-forwarding SSH (ssh -X). Must be run on pi zero. To just get a snapshot
+from the camera (saved as camera-configuration/snapshot.png, just run `camera-setup-wizard.py -o` then
+hit yes.
+
+options:
+  -h, --help            show this help message and exit
+  -s PREVIEW_SIZE, --preview-size PREVIEW_SIZE
+                        The size of the width of the preview window (used as a lores downscale during
+                        phase 1 configuration). Default: 840
+  -m MAX_SIZE MAX_SIZE, --max-size MAX_SIZE MAX_SIZE
+                        When running the formatting config, this is the size the capture starts at. If
+                        you're getting crashes due to memory issues. Turn this down. Default:
+                        (1500,1500)
+  -o, --only-hardware   Use this to just load config files and skip all the format and crop
+                        configuration.
+```
+
 ### retrieve-capture.sh
+NOTE: OUTDATED. Now Please use `camera-setup-wizard.py -o` to go directly to the sample photo section of the setup wizard.
+
 A bash scrip to autonomously connect to the omnicam at 192.168.22.1, take a picture using the "rpicam-jpeg" utility app, copy it locally and then display it full-screen using feh:
 
 ```
