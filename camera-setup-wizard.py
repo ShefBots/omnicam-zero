@@ -1,6 +1,6 @@
 import time
 from picamera2 import Picamera2, Preview
-from cameraUtils import ConfigType, FormatConfigFields, CropConfigFields
+from cameraUtils import ConfigType, FormatConfigFields, CropConfigFields, CROP_SIZE
 import cameraUtils
 import numpy as np
 import json
@@ -12,7 +12,11 @@ import copy
 
 args = argparse.ArgumentParser(description="Walks the user through configuring a camera for use with the omnicam-zero sensor server. Make sure you're running this through X-forwarding SSH (ssh -X). Must be run on pi zero.")
 args.add_argument("-s", "--preview-size", type=int, nargs=1, default=840, help="The size of the width of the preview window (used as a lores downscale during phase 1 configuration). Default: 840")
+args.add_argument("-m", "--max-size", type=int, nargs=2, default=(1000, 1000), help="When running the formatting config, this is the size the capture starts at. If you're getting crashes due to memory issues. Turn this down. Default: (1500,1500)")
+args.add_argument("-o", "--only-hardware", action="store_true", help="Use this to just load config files and skip all the format and crop configuration.")
 args = args.parse_args()
+
+cameraUtils.ensure_configuration_path()
 
 if not args.preview_size:
     print("No preview size specified.")
@@ -23,31 +27,6 @@ def ask_b(s, invert=False):
     if invert and answer == "":
         return False
     return answer == "y" or answer == "yes" or answer == ""
-
-# Initialise the camera
-picam2 = Picamera2()
-
-# Get data
-sensor_modes = picam2.sensor_modes
-camera_controls = picam2.camera_controls
-camera_properties = picam2.camera_properties
-
-if ask_b("Would you like to see the sensor modes, controls and properties?"):
-    print("\nSENSOR MODES:")
-    pprint(sensor_modes)
-    print("\nCAMERA CONTROLS:")
-    # Note: Fully json.dumps-able
-    pprint(camera_controls)
-    print("\nCAMERA PROPERTIES:")
-    pprint(camera_properties) # cam_props["pixelArraySize"] indicates the maximum size
-
-json_format_config = None
-format_config = None
-
-if ask_b("Would you like to attempt to load a formatting configuration file?"):
-    json_format_config = cameraUtils.get_config_data(ConfigType.FMT)
-    if json_format_config == None:
-        print("Error: No formatting config file found.")
 
 def get_preview_size(main_size, prev_size):
     size = (prev_size, int((float(prev_size)/float(main_size[0])) * main_size[1]))
@@ -60,139 +39,282 @@ def configure_lores_to_preview(config, prev_size):
     new_prev_size = get_preview_size(current, prev_size)
     config["lores"]["size"] = new_prev_size
 
-def get_config_from_json_format_config(fmt_config, align=False, preview=False):
-    out = picam2.create_preview_configuration(buffer_count=fmt_config[FormatConfigFields.BUFFER_COUNT],
-                                              queue=fmt_config[FormatConfigFields.QUEUE],
-                                              main={"size": fmt_config[FormatConfigFields.MAIN_SIZE]},#, format:"YUV420"},
-                                              lores={"size": fmt_config[FormatConfigFields.LORES_SIZE]},#, format:"YUV420"},
+def get_config_from_json_format_config(pcam, fmt_config, align=False, preview=False):
+    pprint(fmt_config)
+    out = pcam.create_preview_configuration(buffer_count=fmt_config[FormatConfigFields.BUFFER_COUNT.value],
+                                              queue=fmt_config[FormatConfigFields.QUEUE.value],
+                                              main={"size": fmt_config[FormatConfigFields.MAIN_SIZE.value]},#, format:"YUV420"},
+                                              lores={"size": fmt_config[FormatConfigFields.LORES_SIZE.value]},#, format:"YUV420"},
                                               display="lores",
                                               #sensor={"output_size":mode["size"], "bit_depth":mode["bit_depth"]}
                                              )
     if align:
-        picam2.align_configuration(out)
+        pcam.align_configuration(out)
     if preview:
         configure_lores_to_preview(out, args.preview_size)
     return out
 
 def get_json_format_config_from_config(config):
     json_format_config = {
-                              FormatConfigFields.BUFFER_COUNT:config["buffer_count"],
-                              FormatConfigFields.QUEUE:config["queue"],
-                              FormatConfigFields.MAIN_SIZE:config["main"]["size"],
-                              FormatConfigFields.LORES_SIZE:config["lores"]["size"]
+                              FormatConfigFields.BUFFER_COUNT.value:config["buffer_count"],
+                              FormatConfigFields.QUEUE.value:config["queue"],
+                              FormatConfigFields.MAIN_SIZE.value:config["main"]["size"],
+                              FormatConfigFields.LORES_SIZE.value:config["lores"]["size"]
                            }
+    return json_format_config
 
-if json_format_config == None:
-    print("Creating default formatting config file...")
-    max_size = camera_properties["PixelArraySize"]
-    max_size = (1000,1000) # We'll just use this instead, because the max size kills the pi0
-    #preview_size = (min(max_size[0],args.preview_size[0]), min(max_size[1],args.preview_size[1])) if args.preview_size else max_size
-    json_format_config = {
-                              FormatConfigFields.BUFFER_COUNT:4,
-                              FormatConfigFields.QUEUE:False,
-                              FormatConfigFields.MAIN_SIZE:max_size,
-                              FormatConfigFields.LORES_SIZE:get_preview_size(max_size, args.preview_size),
-                           }
-    format_config = get_config_from_json_format_config(json_format_config, True, True)
+def setup_format_and_crop(args):
 
-else:
-    format_config = get_config_from_json_format_config(json_format_config)
-
-# Formatting phase 1 loop
-print("Now starting formatting phase 1 configuration...")
-while True:
-    picam2.close()
+    # Initialise the camera
     picam2 = Picamera2()
-    picam2.configure(format_config)
-    picam2.start_preview(Preview.QT) # For transmitting over the network when connected over ssh -X
-    picam2.start()
-    if ask_b(f"Main size is at {format_config['main']['size']}. Is this okay?", invert=True):
-        picam2.close()
-        break
-    
+
+    # Get data
+    sensor_modes = picam2.sensor_modes
+    camera_controls = picam2.camera_controls
+    camera_properties = picam2.camera_properties
+
+    if ask_b("Would you like to see the sensor modes, controls and properties?"):
+        print("\nSENSOR MODES:")
+        pprint(sensor_modes)
+        print("\nCAMERA CONTROLS:")
+        # Note: Fully json.dumps-able
+        pprint(camera_controls)
+        print("\nCAMERA PROPERTIES:")
+        pprint(camera_properties) # cam_props["pixelArraySize"] indicates the maximum size
+
+    json_format_config = None
+    format_config = None
+
+    if ask_b("Would you like to attempt to load a formatting configuration file?"):
+        json_format_config = cameraUtils.get_config_data(ConfigType.FMT)
+        if json_format_config == None:
+            print("Error: No formatting config file found.")
+
+
+    if json_format_config == None:
+        print("Creating default formatting config file...")
+        max_size = camera_properties["PixelArraySize"]
+        max_size = (min(args.max_size[0],max_size[0]), min(args.max_size[1], max_size[1])) # We'll just use this instead, because the max size kills the pi0
+        #preview_size = (min(max_size[0],args.preview_size[0]), min(max_size[1],args.preview_size[1])) if args.preview_size else max_size
+        json_format_config = {
+                                  FormatConfigFields.BUFFER_COUNT.value:4,
+                                  FormatConfigFields.QUEUE.value:False,
+                                  FormatConfigFields.MAIN_SIZE.value:max_size,
+                                  FormatConfigFields.LORES_SIZE.value:get_preview_size(max_size, args.preview_size),
+                               }
+        format_config = get_config_from_json_format_config(picam2, json_format_config, True, True)
+
+    else:
+        format_config = get_config_from_json_format_config(picam2, json_format_config)
+
+    # Formatting phase 1 loop
+    print("Now starting formatting phase 1 configuration...")
     while True:
-        new_size = tuple([int(n) for n in input("Enter a new size as two ints: ").split(" ")[:2]])
-        new_json_format_config = copy.deepcopy(json_format_config)
-        new_json_format_config[FormatConfigFields.MAIN_SIZE] = new_size
-        new_json_format_config[FormatConfigFields.LORES_SIZE] = get_preview_size(new_json_format_config[FormatConfigFields.MAIN_SIZE], args.preview_size)
-
-        new_format_config = get_config_from_json_format_config(new_json_format_config, align=True, preview=True)
-        print("New generated config:")
-        pprint(new_format_config)
-
-        new_size = new_format_config['main']['size']
-        if new_size[0] < cameraUtils.CROP_SIZE[0] or new_size[1] < cameraUtils.CROP_SIZE[1]:
-            print(f"That size is too small! Please supply a size bigger than {cameraUtils.CROP_SIZE}")
-        else:
-            format_config = new_format_config
+        picam2.close()
+        picam2 = Picamera2()
+        picam2.configure(format_config)
+        picam2.start_preview(Preview.QT) # For transmitting over the network when connected over ssh -X
+        picam2.start()
+        if ask_b(f"Main size is at {format_config['main']['size']}. Is this okay?", invert=True):
+            picam2.close()
             break
-    print("Loading new size...")
-    picam2.close()
-    
+        
+        while True:
+            new_size = tuple([int(n) for n in input("Enter a new size as two ints: ").split(" ")[:2]])
+            new_json_format_config = copy.deepcopy(json_format_config)
+            new_json_format_config[FormatConfigFields.MAIN_SIZE.value] = new_size
+            new_json_format_config[FormatConfigFields.LORES_SIZE.value] = get_preview_size(new_json_format_config[FormatConfigFields.MAIN_SIZE.value], args.preview_size)
 
-print("Phase 1 complete.")
-print(f"Main image size is set and optimised to {format_config['main']['size']}.We will now configure crop size.")
+            new_format_config = get_config_from_json_format_config(picam2, new_json_format_config, align=True, preview=True)
+            print("New generated config:")
+            pprint(new_format_config)
 
-# Convert it back into a json config, now that we know the main size is optimised
-json_format_config = get_json_format_config_from_config(format_config)
-
-# Load the crop mask
-crop_mask = cameraUtils.load_crop_mask()
-
-# Convert to a mask that works as an overlay (i.e. this will be a sub-section of an overlay object
-# TODO: Make this not just semiopaque and white but an actual outline
-crop_overlay_subsection = np.zeros((crop_mask.shape[0], crop_mask.shape[1], 4), dtype=np.uint8)
-for x in range(crop_mask.shape[0]):
-    for y in range(crop_mask.shape[1]):
-        crop_overlay_subsection[x,y][3] = 128 if crop_mask[x,y]>128 else 0
-
-# Get crop controls
-crop_config = None
-if ask_b("Would you like to attempt to crop configuration file?"):
-    crop_config = cameraUtils.get_config_data(ConfigType.CRP)
-    if crop_config == None:
-        print("Error: No crop config file found.")
-
-if crop_config == None:
-    # Create default crop config
-    crop_config[CropConfigFields.CROP_POSITION] = (0,0)
-
-while True:
-    picam2.close()
-    picam2 = Picamera2()
-
-    # Generate a new config, this time optimising both the main and lores streams
-    #TODO: THIS IS WRONG. LORES SHOULDN'T BE OPTIMISED OR ALIGNED (and main already is) BECAUSE IT NEEDS
-    #      TO BE AS CLOSE AS POSSIBLE TO A MULTIPLE OF MAIN
-    new_config = get_config_from_json_format_config(json_format_config, align=True)
-
-    picam2.configure(new_config)
-    picam2.start_preview(Preview.QT) # For transmitting over the network when connected over ssh -X
-    picam2.start()
-
-
-    # Set the overlay with the crop mask pasted in at CROP_POS from crop_config
-    overlay = crop_overlay_subsection # TODO: This should be a single image the size of lores, with crop mask pasted in at CROP_POS
-
-    # Maybe crop overlay can be moved here?
-
-    picam2.set_overlay(overlay)
-    if ask_b(f"Does the mask align correctly?", invert=True):
+            new_size = new_format_config['main']['size']
+            if new_size[0] < cameraUtils.CROP_SIZE or new_size[1] < cameraUtils.CROP_SIZE:
+                print(f"That size is too small! Please supply a size bigger than {cameraUtils.CROP_SIZE}")
+            else:
+                format_config = new_format_config
+                break
+        print("Loading new size...")
         picam2.close()
-        break
+        
 
+    print("Phase 1 complete.")
+    print(f"Main image size is set and optimised to {format_config['main']['size']}.We will now configure crop size.")
+
+    # Convert it back into a json config, now that we know the main size is optimised
+    json_format_config = get_json_format_config_from_config(format_config)
+
+    # Load the crop mask
+    crop_mask = cameraUtils.load_crop_mask()
+
+    ORANGE = (252, 186, 3, 200)
+
+    # Convert to a mask that works as an overlay (i.e. this will be a sub-section of an overlay object
+    # TODO: Make this not just semiopaque and white but an actual outline
+    crop_overlay_subsection = np.zeros((crop_mask.shape[0], crop_mask.shape[1], 4), dtype=np.uint8)
+    for x in range(1,crop_mask.shape[0]-1):
+        for y in range(1,crop_mask.shape[1]-1):
+            if crop_mask[x,y]>128 and  (crop_mask[x+1,y]<128 or crop_mask[x-1,y]<128 or
+                                        crop_mask[x,y+1]<128 or crop_mask[x,y-1]<128 or
+                                        crop_mask[x+1,y+1]<128 or crop_mask[x-1,y-1]<128 or
+                                        crop_mask[x-1,y+1]<128 or crop_mask[x+1,y-1]<128):
+                crop_overlay_subsection[x,y] = ORANGE
+
+    # Get crop controls
+    crop_config = None
+    if ask_b("Would you like to attempt to load the crop configuration file?", invert=True):
+        crop_config = cameraUtils.get_config_data(ConfigType.CRP)
+        if crop_config == None:
+            print("Error: No crop config file found.")
+
+    if crop_config == None:
+        # Create default crop config
+        crop_config = {}
+        crop_config[CropConfigFields.CROP_POSITION.value] = (0,0)
+
+    #main_size = format_config["main"]["size"]
+    def get_new_lores_size_for(s, main_size):
+        new_lores_size = None
+        if(main_size[0] < main_size[1]):
+            new_lores_size = [1.0, float(main_size[1])/float(main_size[0])]
+        else:
+            new_lores_size = [float(main_size[0])/float(main_size[1]), 1.0]
+        new_lores_size = tuple([int(n*s) for n in new_lores_size])
+        return new_lores_size
+
+
+    # Make Lo-res the smallest it can be to start (crop size)
+    new_lores_size = get_new_lores_size_for(CROP_SIZE, format_config["main"]["size"])
+
+    # Store the main size for ease of use
+    #main_size = json_format_config[FormatConfigFields.MAIN_SIZE.value]
+
+    def update_overlay(lores_size, crop_config):
+        overlay = np.zeros((lores_size[0], lores_size[1], 4), dtype=np.uint8)
+        crop_pos = crop_config[CropConfigFields.CROP_POSITION.value]
+        overlay[crop_pos[0]:crop_pos[0]+CROP_SIZE, crop_pos[1]:crop_pos[1]+CROP_SIZE] = crop_overlay_subsection
+        picam2.set_overlay(overlay)
+
+    new_config = None # Where we'll store the new config
     while True:
-        # TODO: allow user to adjust CROP_POS and low-res size by changing json_format_config (note low-res size will be optimised)
-        # When they change low-res it should just be a scale size compared to main
-        input("some controls (btw you're in an infinite loop)")
-    print("Loading new size...")
-    picam2.close()
+        picam2.close()
+        picam2 = Picamera2()
 
-# We now finally have a json format config file with optimised output in main and lores set to a sane size
-json_format_config = get_json_format_config_from_config(format_config)
-# We also have a configured crop mask config in crop_config for that format config
+        # Generate a new config, this time only optimising the main stream and leaving the lores stream as the bit that it is
+        json_format_config[FormatConfigFields.LORES_SIZE.value] = new_lores_size
+        new_config = get_config_from_json_format_config(picam2, json_format_config, align=False, preview=False)
 
-# TODO: SAVE the 
+        picam2.configure(new_config)
+        picam2.start_preview(Preview.QT) # For transmitting over the network when connected over ssh -X
+        picam2.start()
+
+        update_overlay(new_lores_size, crop_config)
+
+        # Now ask if the overlay needs to move or stuff
+
+        if ask_b(f"Does the mask align correctly?", invert=True):
+            picam2.close()
+            break
+
+        main_size = new_config["main"]["size"]
+        print(f"lores size: {new_lores_size}, crop size: {CROP_SIZE}, main size: {main_size}")
+        print("Edit commands:")
+        print(" >,< n - right/left the crop location")
+        print(" ^,v n - up/down the crop location")
+        print(" *,/ n - increase and decrease the lores size.")
+        print("  d    - indicate you're done.")
+
+        while True:
+            cmd = input("Enter command: ")
+            if(cmd == "d"):
+                break
+            cmd = cmd.split(" ")
+            num = int(cmd[1]) if len(cmd) > 1 else 1
+            command_type = None
+            movement = (0,0)
+            size_change = 0
+            match cmd[0]:
+                case "^":
+                    command_type = "move"
+                    movement = (-num, 0)
+                case "v":
+                    command_type = "move"
+                    movement = (num, 0)
+                case "<":
+                    command_type = "move"
+                    movement = (0, -num)
+                case ">":
+                    command_type = "move"
+                    movement = (0, num)
+                case "*":
+                    command_type = "resize"
+                    size_change = num
+                case "/":
+                    command_type = "resize"
+                    size_change = -num
+
+            # Actually try and make the moves
+            proposed_lores_size = (new_lores_size[0] + size_change, new_lores_size[1] + size_change)
+            if main_size[0] < proposed_lores_size[0] or main_size[1] < proposed_lores_size[1]:
+                print("Error: Proposed size change makes the lores image bigger than the main image!")
+                continue
+            if size_change != 0:
+                # Only update the lores size if it's actually changed, as it requires a whole re-start of the camera
+                new_lores_size = proposed_lores_size
+                break # restart the camera
+
+            proposed_crop_pos = (crop_config[CropConfigFields.CROP_POSITION.value][0] + movement[0],
+                                 crop_config[CropConfigFields.CROP_POSITION.value][1] + movement[1])
+            if proposed_crop_pos[0] < 0 or proposed_crop_pos[1] < 0 or proposed_crop_pos[0] + CROP_SIZE > proposed_lores_size[0] or proposed_crop_pos[1] + CROP_SIZE > proposed_lores_size[1]:
+                print("Error: Proposed movement would move the crop outside of the image!")
+                continue
+
+            # Update the crop pos, no need to exit the for loop
+            crop_config[CropConfigFields.CROP_POSITION.value] = proposed_crop_pos
+            update_overlay(new_lores_size, crop_config)
+                
+
+        print("Loading new size...")
+        picam2.close()
+
+    print("Phase 2 complete.")
+    # We now finally have a json format config file with optimised output in main and lores set to a sane size
+    # We also have a configured crop mask config in crop_config for that format config
+    json_format_config = get_json_format_config_from_config(new_config)
+
+    print("FORMAT:")
+    pprint(json_format_config)
+
+    print("CROP:")
+    pprint(crop_config)
+
+    # SAVE the configurations
+    cameraUtils.backup_files_if_exist()
+
+    print("Saving...")
+    cameraUtils.save_config_data(ConfigType.FMT, json_format_config)
+    cameraUtils.save_config_data(ConfigType.CRP, crop_config)
+    print("Saved!")
+
+
+
+print("Welcome to the hastily put together pi zero camera configuration wizard!")
+if not args.only_hardware:
+    setup_format_and_crop(args)
+
+picam2 = Picamera2()
+json_format_config = cameraUtils.get_config_data(ConfigType.FMT)
+format_config = get_config_from_json_format_config(picam2, json_format_config)
+crop_config = cameraUtils.get_config_data(ConfigType.CRP)
+picam2.close()
+
+print("FORMAT:")
+pprint(format_config)
+print("\nCROP:")
+pprint(crop_config)
+
+print("Now on to camera hardware configuration!")
 
 # Lores MUST be the same aspect ratio as the main image, but scaled so that the circle aligns.
 

@@ -3,6 +3,7 @@ import shutil
 from enum import Enum
 import imageio
 import numpy as np
+import json
 
 class ConfigType(Enum):
     HW = 1
@@ -14,9 +15,13 @@ class FormatConfigFields(Enum):
     QUEUE = "use_queue"
     MAIN_SIZE = "main_size"
     LORES_SIZE = "lores_size"
+    def __str__(self):
+        return self.value
 
 class CropConfigFields(Enum):
     CROP_POSITION = "crop_position"
+    def __str__(self):
+        return self.value
 
 CONFIG_IMAGES_PATH = "camera-configuration"
 HARDWARE_CONTROLS_FILENAME = "hardware-configuration.json"  # Stores the physical hardware settings (wb, exposure, etc)
@@ -24,7 +29,7 @@ FORMAT_CONTROLS_FILENAME = "formatting-configuration.json" # Stores the hardware
 CROP_CONTROLS_FILENAME = "crop-configuration.json" # Stores the cropping and masking configuration
 
 
-CROP_SIZE = (240,240) # The size that crop-mask is.
+CROP_SIZE = 240 # The size that crop-mask is (crops are always circular)
 PERFECT_CROP_IMG_FILENAME = "crop-mask.png" # This just lives out in the open
 
 def load_crop_mask():
@@ -57,6 +62,11 @@ def get_config_data(config_type):
             return json.load(f)
     else:
         return None
+
+def save_config_data(config_type, config):
+    path = _PATH_FROM_TYPE[config_type]
+    with open(path, "w") as f:
+        f.write(json.dumps(config))
 
 # Applies the supplied format object to the picam2 config
 # If no format object is supplied, it loads one from disk.
